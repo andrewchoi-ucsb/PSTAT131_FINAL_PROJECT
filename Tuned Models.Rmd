@@ -1,0 +1,92 @@
+---
+title: "models"
+author: "Andrew Choi"
+date: "2022-12-07"
+output: html_document
+---
+
+```{r}
+# random forest
+cardio_forest <- rand_forest(trees = tune(), min_n = tune(), mtry = tune()) %>%
+  set_engine('randomForest', importance = TRUE) %>%
+  set_mode('classification')
+
+cardio_forest_workflow <- workflow() %>%
+  add_model(cardio_forest) %>%
+  add_recipe(cardio_recipe)
+
+cardio_forest_param <- grid_regular(trees(range = c(10, 150)), min_n(range = c(1, 40)), mtry(range = c(3, 6)), levels = 10)
+
+cardio_forest_tune_res <- tune_grid(
+  cardio_forest_workflow,
+  resamples = cardio_folds,
+  grid = cardio_forest_param
+)
+
+autoplot(cardio_forest_tune_res)
+
+```
+
+```{r}
+
+cardio_boost <- boost_tree(trees = tune(), tree_depth = tune(), mtry = tune()) %>%
+  set_engine('xgboost') %>%
+  set_mode('classification')
+
+cardio_boost_workflow <- workflow() %>%
+  add_model(cardio_boost) %>%
+  add_recipe(cardio_recipe)
+
+cardio_boost_param <- grid_regular(trees(range = c(10, 100)), tree_depth(range = c(4, 7)), mtry(range = c(3, 6)), levels = 10)
+
+cardio_boost_tune_res <- tune_grid(
+  cardio_boost_workflow,
+  resamples = cardio_folds,
+  grid = cardio_boost_param
+)
+
+autoplot(cardio_boost_tune_res)
+
+cardio_boost_best <- select_best(cardio_boost_tune_res)
+
+cardio_boost_final <- finalize_workflow(cardio_boost_workflow, cardio_boost_best)
+
+cardio_boost_final_fit <- fit(cardio_boost_final, data = cardio_train)
+
+augment(cardio_boost_final_fit, new_data = cardio_train) %>%
+  roc_auc(cardio_disease_1, estimate = .pred_0)
+
+
+```
+
+```{r}
+
+cardio_svm <- svm_poly(degree = 1) %>%
+  set_mode('classification') %>%
+  set_engine('kernlab', scaled = FALSE)
+
+cardio_svm_workflow <- workflow() %>%
+  add_model(cardio_svm %>% set_args(cost = tune())) %>%
+  add_formula(cardio_disease_1 ~ .)
+
+cardio_svm_param <- grid_regular(cost(range = c(0, 1)), levels = 10)
+
+cardio_svm_tune_res <- tune_grid(
+  cardio_svm_workflow,
+  resamples = cardio_folds,
+  grid = cardio_svm_param
+)
+
+autoplot(cardio_svm_tune_res)
+
+```
+
+```{r}
+
+save(cardio_forest, cardio_forest_workflow, cardio_forest_param, cardio_forest_tune_res, file = 'Random_Forest_Model.rda')
+
+save(cardio_boost, cardio_boost_workflow, cardio_boost_param, cardio_boost_tune_res, file = 'Boosted_Model.rda')
+
+save(cardio_svm, cardio_svm_workflow, cardio_svm_param, cardio_svm_tune_res, file = 'Support_Vector_Machine_Model.rda')
+
+```
