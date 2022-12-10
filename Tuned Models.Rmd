@@ -1,12 +1,13 @@
 ---
-title: "models"
+title: "Tuned Models"
 author: "Andrew Choi"
 date: "2022-12-07"
 output: html_document
 ---
 
 ```{r}
-# random forest
+
+# Random Forest
 cardio_forest <- rand_forest(trees = tune(), min_n = tune(), mtry = tune()) %>%
   set_engine('randomForest', importance = TRUE) %>%
   set_mode('classification')
@@ -25,10 +26,17 @@ cardio_forest_tune_res <- tune_grid(
 
 autoplot(cardio_forest_tune_res)
 
+cardio_forest_best <- select_best(cardio_forest_tune_res, metric = 'roc_auc')
+
+cardio_forest_final <- finalize_workflow(cardio_forest_workflow, cardio_forest_best)
+
+cardio_forest_final_fit <- fit(cardio_forest_final, data = cardio_train)
+
 ```
 
 ```{r}
 
+# Boosted Trees
 cardio_boost <- boost_tree(trees = tune(), tree_depth = tune(), mtry = tune()) %>%
   set_engine('xgboost') %>%
   set_mode('classification')
@@ -47,20 +55,17 @@ cardio_boost_tune_res <- tune_grid(
 
 autoplot(cardio_boost_tune_res)
 
-cardio_boost_best <- select_best(cardio_boost_tune_res)
+cardio_boost_best <- select_best(cardio_boost_tune_res, metric = 'roc_auc')
 
 cardio_boost_final <- finalize_workflow(cardio_boost_workflow, cardio_boost_best)
 
 cardio_boost_final_fit <- fit(cardio_boost_final, data = cardio_train)
 
-augment(cardio_boost_final_fit, new_data = cardio_train) %>%
-  roc_auc(cardio_disease_1, estimate = .pred_0)
-
-
 ```
 
 ```{r}
 
+# Support Vector Machine
 cardio_svm <- svm_poly(degree = 1) %>%
   set_mode('classification') %>%
   set_engine('kernlab', scaled = FALSE)
@@ -79,14 +84,20 @@ cardio_svm_tune_res <- tune_grid(
 
 autoplot(cardio_svm_tune_res)
 
+cardio_svm_best <- select_best(cardio_svm_tune_res, metric = 'roc_auc')
+
+cardio_svm_final <- finalize_workflow(cardio_svm_workflow, cardio_svm_best)
+
+cardio_svm_final_fit <- fit(cardio_svm_final, data = cardio_train)
+
 ```
 
 ```{r}
 
-save(cardio_forest, cardio_forest_workflow, cardio_forest_param, cardio_forest_tune_res, file = 'Random_Forest_Model.rda')
+save(cardio_forest, cardio_forest_workflow, cardio_forest_param, cardio_forest_tune_res, cardio_forest_best, cardio_forest_final, cardio_forest_final_fit, file = 'Random_Forest_Model.rda')
 
-save(cardio_boost, cardio_boost_workflow, cardio_boost_param, cardio_boost_tune_res, file = 'Boosted_Model.rda')
+save(cardio_boost, cardio_boost_workflow, cardio_boost_param, cardio_boost_tune_res, cardio_boost_best, cardio_boost_final, cardio_boost_final_fit, file = 'Boosted_Model.rda')
 
-save(cardio_svm, cardio_svm_workflow, cardio_svm_param, cardio_svm_tune_res, file = 'Support_Vector_Machine_Model.rda')
+save(cardio_svm, cardio_svm_workflow, cardio_svm_param, cardio_svm_tune_res, cardio_svm_best, cardio_svm_final, cardio_svm_final_fit, file = 'Support_Vector_Machine_Model.rda')
 
 ```
